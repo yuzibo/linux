@@ -1,0 +1,133 @@
+name: vf2-mainline-kernel-build
+
+on:
+  push:
+    tags:
+      - '*'
+    #pull_request:
+    #workflow_dispatch:
+    #schedule:
+    #- cron: "0 2 * * *"
+
+env:
+  mainline_toolchain: https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.10.18
+  mainline_toolchain_file_name: riscv64-glibc-ubuntu-22.04-gcc-nightly-2023.10.18-nightly.tar.gz
+  wget_alias: 'wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 0'
+  ARCH: riscv
+  board: vf2 
+  KBUILD_BUILD_USER: builder
+  KBUILD_BUILD_HOST: vf2-riscv-builder
+  KDEB_COMPRESS: xz
+  KDEB_CHANGELOG_DIST: unstable
+
+jobs:
+  kernel:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gcc-13
+
+    runs-on: ubuntu-22.04
+    env:
+      CROSS_COMPILE: riscv64-unknown-linux-gnu-
+
+    steps:
+      - name: "Update APT sources"
+        run: |
+          sudo apt update
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: true
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Install software
+        run: |
+              sudo apt install -y gdisk dosfstools g++-12-riscv64-linux-gnu build-essential \
+                                  libncurses-dev gawk flex bison openssl libssl-dev tree \
+                                  dkms libelf-dev libudev-dev libpci-dev libiberty-dev autoconf device-tree-compiler \
+                                  devscripts debhelper pahole
+
+      - name: Checkout kernel
+        uses: actions/checkout@v4
+        with:
+            path: 'kernel'
+
+      - name: Compile Kernel && Install
+        run: |
+              mkdir -p vf2_kernel_deb_full
+              mkdir -p vf2_kernel_deb
+
+              #if [[ ${{ matrix.name }} = "thead-gcc" ]]; then
+              #  ${wget_alias} ${xuantie_toolchain}/${toolchain_file_name}
+              #  tar -xvf ${toolchain_file_name} -C /opt
+              #  export PATH="/opt/Xuantie-900-gcc-linux-5.10.4-glibc-x86_64-V2.8.0/bin:$PATH"
+              #else
+              ${wget_alias} ${mainline_toolchain}/${mainline_toolchain_file_name}
+              tar -xvf ${mainline_toolchain_file_name} -C /opt
+              export PATH="/opt/riscv/bin:$PATH"
+                #fi
+              ${CROSS_COMPILE}gcc -v
+
+              pushd kernel
+                make debian_defconfig
+                export KDEB_PKGVERSION="$(date "+%Y.%m.%d.%H.%M")+$(git rev-parse --short HEAD)"
+                #if [ x"${{ matrix.name }}" = x"gcc-12" ]; then
+                #  echo "CONFIG_THEAD_ISA=n" >> .config
+                #elif [ x"${{ matrix.name }}" = x"thead-gcc" ]; then
+                #  echo "CONFIG_THEAD_ISA=y" >> .config
+                #fi
+                make -j$(nproc) bindeb-pkg LOCALVERSION="-${board}"
+                make -j$(nproc) dtbs
+
+                # Copy deb
+                sudo dcmd cp -v ../*.changes ${GITHUB_WORKSPACE}/vf2_kernel_deb_full
+                sudo cp -v ../linux-headers-* ${GITHUB_WORKSPACE}/vf2_kernel_deb
+                sudo find ../ -type f -name "linux-image*" -not -name "*dbg*" -exec cp {} ${GITHUB_WORKSPACE}/vf2_kernel_deb \; 
+
+                # record commit-id
+                git rev-parse HEAD > kernel-commitid
+                sudo cp -v kernel-commitid ${GITHUB_WORKSPACE}/vf2_kernel_deb_full
+
+                # Install DTB
+                #sudo cp -v arch/riscv/boot/dts/thead/*.dtb ${GITHUB_WORKSPACE}/rootfs/boot/
+              popd
+
+      - name: compress
+        run: |
+              tar -zcvf vf2-mainline-full-kernel-${{ matrix.name }}.tar.gz vf2_kernel_deb_full
+              tar -zcvf vf2-mainline-kernel-${{ matrix.name }}.tar.gz vf2_kernel_deb
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            vf2-mainline-full-kernel-${{ matrix.name }}.tar.gz
+            vf2-mainline-kernel-${{ matrix.name }}.tar.gz
+
+            # - name: Release
+            #uses: softprops/action-gh-release@v1
+            #if: startsWith(github.ref, 'refs/tags/')
+            #with:
+            # files: |
+            #vf2-mainline-kernel-${{ matrix.name }}.tar.gz
+            #- name: 'Upload Artifact'
+            #uses: actions/upload-artifact@v3
+            # with:
+            #name: vf2-mainline-full-kernel-${{ matrix.name }}.tar.gz vf2-mainline-kernel-${{ matrix.name }}.tar.gz
+            #path: |
+            #     vf2-mainline-full-kernel-${{ matrix.name }}.tar.gz 
+            #     vf2-mainline-kernel-${{ matrix.name }}.tar.gz
+            #retention-days: 30
