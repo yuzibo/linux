@@ -1,18 +1,16 @@
-Linux kernel
-============
+This is forked linux kernel source code to track supporting for vf2.
 
-There are several guides for kernel developers and users. These guides can
-be rendered in a number of formats, like HTML and PDF. Please read
-Documentation/admin-guide/README.rst first.
+The Upstream status is here:
+https://rvspace.org/en/project/JH7110_Upstream_Plan
 
-In order to build the documentation, use ``make htmldocs`` or
-``make pdfdocs``.  The formatted documentation can also be read online at:
+Now, the repo only contains the pending patchset as below:
 
-    https://www.kernel.org/doc/html/latest/
+[timer v8]: https://lore.kernel.org/linux-riscv/20231219145402.7879-1-xingyu.wu@starfivetech.com/
 
-There are various text files in the Documentation/ subdirectory,
-several of them using the Restructured Text markup notation.
+(not included)HDMI/ DC8200: [v2]: https://patchwork.kernel.org/project/linux-riscv/cover/20231025103957.3776-1-keith.zhao@starfivetech.com/ 
 
-Please read the Documentation/process/changes.rst file, as it contains the
-requirements for building and running the kernel, and information about
-the problems which may result by upgrading your kernel.
+[pwm v10]: https://lore.kernel.org/linux-riscv/20231222094548.54103-1-william.qiu@starfivetech.com/
+
+[PCIe v14]: https://lore.kernel.org/linux-riscv/20240108110612.19048-1-minda.chen@starfivetech.com/T/#mbd006f7be8d4dc97a095681f023b884e8cff67cb
+
+[clk: Set PLL0 rate to 1.5GHz]https://lore.kernel.org/all/20230811033631.160912-1-xingyu.wu@starfivetech.com/
