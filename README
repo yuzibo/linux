@@ -12,3 +12,5 @@ Now, the repo only contains the pending patchset as below:
 [pwm v10]: https://lore.kernel.org/linux-riscv/20231222094548.54103-1-william.qiu@starfivetech.com/
 
 [PCIe v14]: https://lore.kernel.org/linux-riscv/20240108110612.19048-1-minda.chen@starfivetech.com/T/#mbd006f7be8d4dc97a095681f023b884e8cff67cb
+
+[set PLL0 rate to 1.5Ghz v1]https://lore.kernel.org/all/20230811033631.160912-1-xingyu.wu@starfivetech.com/
