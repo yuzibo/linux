@@ -1,18 +1,9 @@
-Linux kernel
-============
+2024/06/03
 
-There are several guides for kernel developers and users. These guides can
-be rendered in a number of formats, like HTML and PDF. Please read
-Documentation/admin-guide/README.rst first.
+[timer v10]: https://lore.kernel.org/all/20240412084543.7243-1-ziv.xu@starfivetech.com/ 
 
-In order to build the documentation, use ``make htmldocs`` or
-``make pdfdocs``.  The formatted documentation can also be read online at:
+[pcie v16]: https://patchwork.kernel.org/project/linux-riscv/cover/20240328091835.14797-1-minda.chen@starfivetech.com/
 
-    https://www.kernel.org/doc/html/latest/
+[pwm v12]: https://patchwork.ozlabs.org/project/linux-pwm/patch/20240429075140.56867-1-william.qiu@starfivetech.com/
 
-There are various text files in the Documentation/ subdirectory,
-several of them using the reStructuredText markup notation.
-
-Please read the Documentation/process/changes.rst file, as it contains the
-requirements for building and running the kernel, and information about
-the problems which may result by upgrading your kernel.
+[clk: Set PLL0 rate to 1.5GHz]https://lore.kernel.org/all/20230811033631.160912-1-xingyu.wu@starfivetech.com/
