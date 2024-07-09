@@ -425,4 +425,7 @@ int stf_isp_init(struct stfcamss *stfcamss);
 int stf_isp_register(struct stf_isp_dev *isp_dev, struct v4l2_device *v4l2_dev);
 int stf_isp_unregister(struct stf_isp_dev *isp_dev);
 
+void stf_set_yuv_addr(struct stfcamss *stfcamss,
+		      dma_addr_t y_addr, dma_addr_t uv_addr);
+
 #endif /* STF_ISP_H */
