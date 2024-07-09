@@ -20990,6 +20990,7 @@ L:	linux-media@vger.kernel.org
 S:	Maintained
 F:	Documentation/admin-guide/media/starfive_camss.rst
 F:	Documentation/devicetree/bindings/media/starfive,jh7110-camss.yaml
+F:	Documentation/userspace-api/media/v4l/metafmt-starfive-isp.rst
 F:	drivers/staging/media/starfive/camss
 F:	include/uapi/linux/jh7110-isp.h
 
