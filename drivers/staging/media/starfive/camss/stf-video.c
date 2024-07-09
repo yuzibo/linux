@@ -570,7 +570,6 @@ static const struct v4l2_file_operations stf_vid_fops = {
 	.release        = vb2_fop_release,
 	.poll           = vb2_fop_poll,
 	.mmap           = vb2_fop_mmap,
-	.read           = vb2_fop_read,
 };
 
 /* -----------------------------------------------------------------------------
