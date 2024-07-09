@@ -128,6 +128,7 @@ static int stfcamss_register_devs(struct stfcamss *stfcamss)
 {
 	struct stf_capture *cap_yuv = &stfcamss->captures[STF_CAPTURE_YUV];
 	struct stf_capture *cap_scd = &stfcamss->captures[STF_CAPTURE_SCD];
+	struct stf_output *output = &stfcamss->output;
 	struct stf_isp_dev *isp_dev = &stfcamss->isp_dev;
 	int ret;
 
@@ -138,11 +139,18 @@ static int stfcamss_register_devs(struct stfcamss *stfcamss)
 		return ret;
 	}
 
-	ret = stf_capture_register(stfcamss, &stfcamss->v4l2_dev);
+	ret = stf_output_register(stfcamss, &stfcamss->v4l2_dev);
 	if (ret < 0) {
 		dev_err(stfcamss->dev,
 			"failed to register capture: %d\n", ret);
 		goto err_isp_unregister;
+	}
+
+	ret = stf_capture_register(stfcamss, &stfcamss->v4l2_dev);
+	if (ret < 0) {
+		dev_err(stfcamss->dev,
+			"failed to register capture: %d\n", ret);
+		goto err_out_unregister;
 	}
 
 	ret = media_create_pad_link(&isp_dev->subdev.entity, STF_ISP_PAD_SRC,
@@ -159,13 +167,23 @@ static int stfcamss_register_devs(struct stfcamss *stfcamss)
 
 	cap_scd->video.source_subdev = &isp_dev->subdev;
 
+	ret = media_create_pad_link(&output->video.vdev.entity, 0,
+				    &isp_dev->subdev.entity, STF_ISP_PAD_SINK_PARAMS,
+				    0);
+	if (ret)
+		goto err_rm_links1;
+
 	return ret;
 
+err_rm_links1:
+	media_entity_remove_links(&cap_scd->video.vdev.entity);
 err_rm_links0:
 	media_entity_remove_links(&isp_dev->subdev.entity);
 	media_entity_remove_links(&cap_yuv->video.vdev.entity);
 err_cap_unregister:
 	stf_capture_unregister(stfcamss);
+err_out_unregister:
+	stf_output_unregister(stfcamss);
 err_isp_unregister:
 	stf_isp_unregister(&stfcamss->isp_dev);
 
@@ -176,14 +194,17 @@ static void stfcamss_unregister_devs(struct stfcamss *stfcamss)
 {
 	struct stf_capture *cap_yuv = &stfcamss->captures[STF_CAPTURE_YUV];
 	struct stf_capture *cap_scd = &stfcamss->captures[STF_CAPTURE_SCD];
+	struct stf_output *output = &stfcamss->output;
 	struct stf_isp_dev *isp_dev = &stfcamss->isp_dev;
 
+	media_entity_remove_links(&output->video.vdev.entity);
 	media_entity_remove_links(&isp_dev->subdev.entity);
 	media_entity_remove_links(&cap_yuv->video.vdev.entity);
 	media_entity_remove_links(&cap_scd->video.vdev.entity);
 
 	stf_isp_unregister(&stfcamss->isp_dev);
 	stf_capture_unregister(stfcamss);
+	stf_output_unregister(stfcamss);
 }
 
 static int stfcamss_subdev_notifier_bound(struct v4l2_async_notifier *async,

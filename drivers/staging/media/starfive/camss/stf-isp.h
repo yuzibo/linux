@@ -472,4 +472,8 @@ void stf_set_scd_addr(struct stfcamss *stfcamss,
 		      dma_addr_t yhist_addr, dma_addr_t scd_addr,
 		      enum stf_isp_type_scd type_scd);
 
+int stf_isp_params_register(struct stfcamss_video *video,
+			    struct v4l2_device *v4l2_dev,
+			    const char *name);
+
 #endif /* STF_ISP_H */

@@ -9,6 +9,8 @@ starfive-camss-objs += \
 		stf-capture.o \
 		stf-isp.o \
 		stf-isp-hw-ops.o \
+		stf-isp-params.o \
+		stf-output.o \
 		stf-video.o
 
 obj-$(CONFIG_VIDEO_STARFIVE_CAMSS) += starfive-camss.o

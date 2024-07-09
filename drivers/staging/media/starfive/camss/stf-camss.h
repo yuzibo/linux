@@ -21,6 +21,7 @@
 #include "stf-buffer.h"
 #include "stf-isp.h"
 #include "stf-capture.h"
+#include "stf-output.h"
 
 enum stf_port_num {
 	STF_PORT_DVP = 0,
@@ -55,6 +56,7 @@ struct stfcamss {
 	struct device *dev;
 	struct stf_isp_dev isp_dev;
 	struct stf_capture captures[STF_CAPTURE_NUM];
+	struct stf_output output;
 	struct v4l2_async_notifier notifier;
 	void __iomem *syscon_base;
 	void __iomem *isp_base;
@@ -132,4 +134,5 @@ static inline void stf_syscon_reg_clear_bit(struct stfcamss *stfcamss,
 	value = ioread32(stfcamss->syscon_base + reg);
 	iowrite32(value & ~bit_mask, stfcamss->syscon_base + reg);
 }
+
 #endif /* STF_CAMSS_H */
