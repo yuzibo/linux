@@ -24,13 +24,23 @@ static const struct stf_isp_format isp_formats_sink[] = {
 	{ MEDIA_BUS_FMT_SBGGR10_1X10, 10 },
 };
 
+static const struct stf_isp_format isp_formats_sink_params[] = {
+       { MEDIA_BUS_FMT_METADATA_FIXED },
+};
+
 static const struct stf_isp_format isp_formats_source[] = {
 	{ MEDIA_BUS_FMT_YUYV8_1_5X8, 8 },
 };
 
+static const struct stf_isp_format isp_formats_source_scd[] = {
+       { MEDIA_BUS_FMT_METADATA_FIXED },
+};
+
 static const struct stf_isp_format_table isp_formats_st7110[] = {
 	{ isp_formats_sink, ARRAY_SIZE(isp_formats_sink) },
+        { isp_formats_sink_params, ARRAY_SIZE(isp_formats_sink_params) },
 	{ isp_formats_source, ARRAY_SIZE(isp_formats_source) },
+        { isp_formats_source_scd, ARRAY_SIZE(isp_formats_source_scd) },
 };
 
 static const struct stf_isp_format *
@@ -99,13 +109,19 @@ static void isp_try_format(struct stf_isp_dev *isp_dev,
 	else if (pad == STF_ISP_PAD_SRC)
 		formats = &isp_dev->formats[SOURCE_FORMATS_INDEX];
 
-	fmt->width = clamp_t(u32, fmt->width, STFCAMSS_FRAME_MIN_WIDTH,
-			     STFCAMSS_FRAME_MAX_WIDTH);
-	fmt->height = clamp_t(u32, fmt->height, STFCAMSS_FRAME_MIN_HEIGHT,
-			      STFCAMSS_FRAME_MAX_HEIGHT);
-	fmt->height &= ~0x1;
+        if (pad != STF_ISP_PAD_SRC_SCD && pad != STF_ISP_PAD_SINK_PARAMS) {
+               fmt->width = clamp_t(u32, fmt->width, STFCAMSS_FRAME_MIN_WIDTH,
+                                    STFCAMSS_FRAME_MAX_WIDTH);
+               fmt->height = clamp_t(u32, fmt->height, STFCAMSS_FRAME_MIN_HEIGHT,
+                                     STFCAMSS_FRAME_MAX_HEIGHT);
+               fmt->height &= ~0x1;
+               fmt->colorspace = V4L2_COLORSPACE_SRGB;
+         } else {
+               fmt->width = 1;
+               fmt->height = 1;
+        }
+
 	fmt->field = V4L2_FIELD_NONE;
-	fmt->colorspace = V4L2_COLORSPACE_SRGB;
 	fmt->flags = 0;
 
 	if (!stf_g_fmt_by_mcode(formats, fmt->code))
@@ -125,7 +141,7 @@ static int isp_enum_mbus_code(struct v4l2_subdev *sd,
 
 		formats = &isp_dev->formats[SINK_FORMATS_INDEX];
 		code->code = formats->fmts[code->index].code;
-	} else {
+	} else if (code->pad == STF_ISP_PAD_SRC) {
 		struct v4l2_mbus_framefmt *sink_fmt;
 
 		if (code->index >= ARRAY_SIZE(isp_formats_source))
@@ -137,7 +153,12 @@ static int isp_enum_mbus_code(struct v4l2_subdev *sd,
 		code->code = sink_fmt->code;
 		if (!code->code)
 			return -EINVAL;
-	}
+                else {
+                     if (code->index > 0)
+                       return -EINVAL;
+                       code->code = MEDIA_BUS_FMT_METADATA_FIXED;
+
+	       }
 	code->flags = 0;
 
 	return 0;
@@ -156,6 +177,9 @@ static int isp_set_format(struct v4l2_subdev *sd,
 
 	isp_try_format(isp_dev, state, fmt->pad, &fmt->format);
 	*format = fmt->format;
+
+        if (fmt->pad == STF_ISP_PAD_SRC_SCD || fmt->pad == STF_ISP_PAD_SINK_PARAMS)
+                return 0;
 
 	isp_dev->current_fmt = stf_g_fmt_by_mcode(&isp_dev->formats[fmt->pad],
 						  fmt->format.code);
@@ -208,6 +232,9 @@ static int isp_get_selection(struct v4l2_subdev *sd,
 	struct v4l2_subdev_format fmt = { 0 };
 	struct v4l2_rect *rect;
 
+        if (sel->pad == STF_ISP_PAD_SRC_SCD || sel->pad == STF_ISP_PAD_SINK_PARAMS)
+                return -EINVAL;
+
 	switch (sel->target) {
 	case V4L2_SEL_TGT_CROP_BOUNDS:
 		if (sel->pad == STF_ISP_PAD_SINK) {
@@ -244,6 +271,9 @@ static int isp_set_selection(struct v4l2_subdev *sd,
 {
 	struct stf_isp_dev *isp_dev = v4l2_get_subdevdata(sd);
 	struct v4l2_rect *rect;
+
+        if (sel->pad == STF_ISP_PAD_SRC_SCD || sel->pad == STF_ISP_PAD_SINK_PARAMS)
+               return -EINVAL;
 
 	if (sel->target != V4L2_SEL_TGT_CROP)
 		return -EINVAL;
@@ -302,8 +332,39 @@ static int isp_init_formats(struct v4l2_subdev *sd,
 			.height = 1080
 		}
 	};
+         struct v4l2_subdev_format format_params = {
+               .pad = STF_ISP_PAD_SINK_PARAMS,
+               .which = V4L2_SUBDEV_FORMAT_ACTIVE,
+               .format = {
+                       .code = MEDIA_BUS_FMT_METADATA_FIXED,
+                       .width = 1,
+                       .height = 1
+               }
+       };
+       struct v4l2_subdev_format format_scd = {
+               .pad = STF_ISP_PAD_SRC_SCD,
+               .which = V4L2_SUBDEV_FORMAT_ACTIVE,
+               .format = {
+                       .code = MEDIA_BUS_FMT_METADATA_FIXED,
+                       .width = 1,
+                       .height = 1
+               }
+       };
+       int ret;
 
-	return isp_set_format(sd, sd_state, &format);
+       /* Init for STF_ISP_PAD_SINK and STF_ISP_PAD_SRC pad */
+       ret = isp_set_format(sd, sd_state, &format);
+       if (ret < 0)
+               return ret;
+
+       /* Init for STF_ISP_PAD_SINK_PARAMS pad */
+       ret = isp_set_format(sd, sd_state, &format_params);
+       if (ret < 0)
+               return ret;
+
+       /* Init for STF_ISP_PAD_SRC_SCD pad */
+       return isp_set_format(sd, sd_state, &format_scd);
+
 }
 
 static const struct v4l2_subdev_video_ops isp_video_ops = {
@@ -344,7 +405,9 @@ int stf_isp_register(struct stf_isp_dev *isp_dev, struct v4l2_device *v4l2_dev)
 	v4l2_set_subdevdata(sd, isp_dev);
 
 	pads[STF_ISP_PAD_SINK].flags = MEDIA_PAD_FL_SINK;
+        pads[STF_ISP_PAD_SINK_PARAMS].flags = MEDIA_PAD_FL_SINK;
 	pads[STF_ISP_PAD_SRC].flags = MEDIA_PAD_FL_SOURCE;
+        pads[STF_ISP_PAD_SRC_SCD].flags = MEDIA_PAD_FL_SOURCE;
 
 	sd->entity.function = MEDIA_ENT_F_PROC_VIDEO_ISP;
 	sd->entity.ops = &isp_media_ops;
