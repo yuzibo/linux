@@ -23,6 +23,7 @@ enum stf_v_state {
 struct stfcamss_buffer {
 	struct vb2_v4l2_buffer vb;
 	dma_addr_t addr[2];
+	void *vaddr;
 	struct list_head queue;
 };
 

@@ -8,6 +8,7 @@
  *
  * Author: Jack Zhu <jack.zhu@starfivetech.com>
  * Author: Changhuang Liang <changhuang.liang@starfivetech.com>
+ * Author: Keith Zhao <keith.zhao@starfivetech.com>
  *
  */
 #include <linux/module.h>
@@ -126,6 +127,7 @@ err_cleanup:
 static int stfcamss_register_devs(struct stfcamss *stfcamss)
 {
 	struct stf_capture *cap_yuv = &stfcamss->captures[STF_CAPTURE_YUV];
+	struct stf_capture *cap_scd = &stfcamss->captures[STF_CAPTURE_SCD];
 	struct stf_isp_dev *isp_dev = &stfcamss->isp_dev;
 	int ret;
 
@@ -150,8 +152,18 @@ static int stfcamss_register_devs(struct stfcamss *stfcamss)
 
 	cap_yuv->video.source_subdev = &isp_dev->subdev;
 
+	ret = media_create_pad_link(&isp_dev->subdev.entity, STF_ISP_PAD_SRC_SCD,
+				    &cap_scd->video.vdev.entity, 0, 0);
+	if (ret)
+		goto err_rm_links0;
+
+	cap_scd->video.source_subdev = &isp_dev->subdev;
+
 	return ret;
 
+err_rm_links0:
+	media_entity_remove_links(&isp_dev->subdev.entity);
+	media_entity_remove_links(&cap_yuv->video.vdev.entity);
 err_cap_unregister:
 	stf_capture_unregister(stfcamss);
 err_isp_unregister:
@@ -163,10 +175,12 @@ err_isp_unregister:
 static void stfcamss_unregister_devs(struct stfcamss *stfcamss)
 {
 	struct stf_capture *cap_yuv = &stfcamss->captures[STF_CAPTURE_YUV];
+	struct stf_capture *cap_scd = &stfcamss->captures[STF_CAPTURE_SCD];
 	struct stf_isp_dev *isp_dev = &stfcamss->isp_dev;
 
 	media_entity_remove_links(&isp_dev->subdev.entity);
 	media_entity_remove_links(&cap_yuv->video.vdev.entity);
+	media_entity_remove_links(&cap_scd->video.vdev.entity);
 
 	stf_isp_unregister(&stfcamss->isp_dev);
 	stf_capture_unregister(stfcamss);
@@ -438,5 +452,6 @@ module_platform_driver(stfcamss_driver);
 
 MODULE_AUTHOR("Jack Zhu <jack.zhu@starfivetech.com>");
 MODULE_AUTHOR("Changhuang Liang <changhuang.liang@starfivetech.com>");
+MODULE_AUTHOR("Keith Zhao <keith.zhao@starfivetech.com>");
 MODULE_DESCRIPTION("StarFive Camera Subsystem driver");
 MODULE_LICENSE("GPL");
