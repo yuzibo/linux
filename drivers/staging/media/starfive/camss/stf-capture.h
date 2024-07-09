@@ -48,28 +48,6 @@
 #define U0_VIN_P_I_MIPI_HAEDER_EN0_MASK		BIT(12)
 #define U0_VIN_PIX_NUM_MASK			GENMASK(16, 13)
 
-enum stf_v_state {
-	STF_OUTPUT_OFF,
-	STF_OUTPUT_RESERVED,
-	STF_OUTPUT_SINGLE,
-	STF_OUTPUT_CONTINUOUS,
-	STF_OUTPUT_IDLE,
-	STF_OUTPUT_STOPPING
-};
-
-struct stf_v_buf {
-	int active_buf;
-	struct stfcamss_buffer *buf[2];
-	struct stfcamss_buffer *last_buffer;
-	struct list_head pending_bufs;
-	struct list_head ready_bufs;
-	enum stf_v_state state;
-	unsigned int sequence;
-	/* protects the above member variables */
-	spinlock_t lock;
-	atomic_t frame_skip;
-};
-
 struct stf_capture {
 	struct stfcamss_video video;
 	struct stf_v_buf buffers;

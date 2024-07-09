@@ -4,6 +4,7 @@
 #
 
 starfive-camss-objs += \
+		stf-buffer.o \
 		stf-camss.o \
 		stf-capture.o \
 		stf-isp.o \

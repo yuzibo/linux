@@ -10,13 +10,13 @@
 #ifndef STF_VIDEO_H
 #define STF_VIDEO_H
 
-#include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/videodev2.h>
 #include <media/v4l2-dev.h>
 #include <media/v4l2-fh.h>
 #include <media/v4l2-ioctl.h>
-#include <media/videobuf2-v4l2.h>
+
+#include "stf-buffer.h"
 
 #define STFCAMSS_FRAME_MIN_WIDTH		64
 #define STFCAMSS_FRAME_MAX_WIDTH		1920
@@ -38,12 +38,6 @@ enum stf_capture_type {
 	STF_CAPTURE_RAW = 0,
 	STF_CAPTURE_YUV,
 	STF_CAPTURE_NUM,
-};
-
-struct stfcamss_buffer {
-	struct vb2_v4l2_buffer vb;
-	dma_addr_t addr[2];
-	struct list_head queue;
 };
 
 struct fract {

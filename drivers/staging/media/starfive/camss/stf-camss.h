@@ -18,6 +18,7 @@
 #include <media/v4l2-async.h>
 #include <media/v4l2-device.h>
 
+#include "stf-buffer.h"
 #include "stf-isp.h"
 #include "stf-capture.h"
 
