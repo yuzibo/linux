@@ -368,7 +368,7 @@ static void stf_buf_flush(struct stf_v_buf *output, enum vb2_buffer_state state)
 	}
 }
 
-static void stf_buf_done(struct stf_v_buf *output)
+static struct stfcamss_buffer *stf_buf_done(struct stf_v_buf *output)
 {
 	struct stfcamss_buffer *ready_buf;
 	u64 ts = ktime_get_ns();
@@ -376,27 +376,27 @@ static void stf_buf_done(struct stf_v_buf *output)
 
 	if (output->state == STF_OUTPUT_OFF ||
 	    output->state == STF_OUTPUT_RESERVED)
-		return;
+		return NULL;
 
 	spin_lock_irqsave(&output->lock, flags);
 
-	while ((ready_buf = stf_buf_get_ready(output))) {
+	ready_buf = stf_buf_get_ready(output);
+	if (ready_buf) {
 		ready_buf->vb.vb2_buf.timestamp = ts;
 		ready_buf->vb.sequence = output->sequence++;
-
-		vb2_buffer_done(&ready_buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
 	}
 
 	spin_unlock_irqrestore(&output->lock, flags);
+
+	return ready_buf;
 }
 
-static void stf_change_buffer(struct stf_v_buf *output)
+static struct stfcamss_buffer *stf_change_buffer(struct stf_v_buf *output)
 {
 	struct stf_capture *cap = container_of(output, struct stf_capture,
 					       buffers);
 	struct stfcamss *stfcamss = cap->video.stfcamss;
 	struct stfcamss_buffer *ready_buf;
-	dma_addr_t *new_addr;
 	unsigned long flags;
 	u32 active_index;
 
@@ -404,7 +404,7 @@ static void stf_change_buffer(struct stf_v_buf *output)
 	    output->state == STF_OUTPUT_STOPPING ||
 	    output->state == STF_OUTPUT_RESERVED ||
 	    output->state == STF_OUTPUT_IDLE)
-		return;
+		return NULL;
 
 	spin_lock_irqsave(&output->lock, flags);
 
@@ -426,37 +426,37 @@ static void stf_change_buffer(struct stf_v_buf *output)
 
 	/* Get next buffer */
 	output->buf[active_index] = stf_buf_get_pending(output);
-	if (!output->buf[active_index]) {
-		new_addr = ready_buf->addr;
+	if (!output->buf[active_index])
 		stf_buf_update_on_last(output);
-	} else {
-		new_addr = output->buf[active_index]->addr;
+	else
 		stf_buf_update_on_next(output);
-	}
 
-	if (output->state == STF_OUTPUT_STOPPING) {
+	if (output->state == STF_OUTPUT_STOPPING)
 		output->last_buffer = ready_buf;
-	} else {
-		if (cap->type == STF_CAPTURE_RAW)
-			stf_set_raw_addr(stfcamss, new_addr[0]);
-		else if (cap->type == STF_CAPTURE_YUV)
-			stf_set_yuv_addr(stfcamss, new_addr[0], new_addr[1]);
-
+	else
 		stf_buf_add_ready(output, ready_buf);
-	}
 
 out_unlock:
 	spin_unlock_irqrestore(&output->lock, flags);
+
+	return output->buf[active_index];
 }
 
 irqreturn_t stf_wr_irq_handler(int irq, void *priv)
 {
 	struct stfcamss *stfcamss = priv;
 	struct stf_capture *cap = &stfcamss->captures[STF_CAPTURE_RAW];
+	struct stfcamss_buffer *change_buf;
+	struct stfcamss_buffer *ready_buf;
 
 	if (atomic_dec_if_positive(&cap->buffers.frame_skip) < 0) {
-		stf_change_buffer(&cap->buffers);
-		stf_buf_done(&cap->buffers);
+		change_buf = stf_change_buffer(&cap->buffers);
+		if (change_buf)
+			stf_set_raw_addr(stfcamss, change_buf->addr[0]);
+
+		ready_buf = stf_buf_done(&cap->buffers);
+		if (ready_buf)
+			vb2_buffer_done(&ready_buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
 	}
 
 	stf_syscon_reg_set_bit(stfcamss, VIN_INRT_PIX_CFG, U0_VIN_INTR_CLEAN);
@@ -469,12 +469,16 @@ irqreturn_t stf_isp_irq_handler(int irq, void *priv)
 {
 	struct stfcamss *stfcamss = priv;
 	struct stf_capture *cap = &stfcamss->captures[STF_CAPTURE_YUV];
+	struct stfcamss_buffer *ready_buf;
 	u32 status;
 
 	status = stf_isp_reg_read(stfcamss, ISP_REG_ISP_CTRL_0);
 	if (status & ISPC_ISP) {
-		if (status & ISPC_ENUO)
-			stf_buf_done(&cap->buffers);
+		if (status & ISPC_ENUO) {
+			ready_buf = stf_buf_done(&cap->buffers);
+			if (ready_buf)
+				vb2_buffer_done(&ready_buf->vb.vb2_buf, VB2_BUF_STATE_DONE);
+		}
 
 		stf_isp_reg_write(stfcamss, ISP_REG_ISP_CTRL_0,
 				  (status & ~ISPC_INT_ALL_MASK) |
@@ -488,13 +492,18 @@ irqreturn_t stf_line_irq_handler(int irq, void *priv)
 {
 	struct stfcamss *stfcamss = priv;
 	struct stf_capture *cap = &stfcamss->captures[STF_CAPTURE_YUV];
+	struct stfcamss_buffer *change_buf;
 	u32 status;
 
 	status = stf_isp_reg_read(stfcamss, ISP_REG_ISP_CTRL_0);
 	if (status & ISPC_LINE) {
 		if (atomic_dec_if_positive(&cap->buffers.frame_skip) < 0) {
-			if ((status & ISPC_ENUO))
-				stf_change_buffer(&cap->buffers);
+			if ((status & ISPC_ENUO)) {
+				change_buf = stf_change_buffer(&cap->buffers);
+				if (change_buf)
+					stf_set_yuv_addr(stfcamss, change_buf->addr[0],
+							 change_buf->addr[1]);
+			}
 		}
 
 		stf_isp_reg_set_bit(stfcamss, ISP_REG_CSIINTS,
